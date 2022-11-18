@@ -1,0 +1,39 @@
+# Build Results
+[Bb]in/
+[Oo]bj/
+output/
+
+# Log Files
+*.log
+
+# JetBrains Rider
+.idea/
+*.sln.iml
+
+# DotSettings
+*.DotSettings.user
+
+# NuGet
+.nuget/packages
+
+# SonarQube
+.sonarqube
+
+# Terraform
+.terraform/
+*.tfstate*
+*.local.tfvars
+terraform/builds/*
+
+# node
+**/node_modules/*
+
+# Nuke
+.nuke/temp
+
+target
+
+.fake
+
+# Generated Files
+docs/schema.md

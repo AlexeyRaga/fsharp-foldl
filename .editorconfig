@@ -1,0 +1,42 @@
+root = true
+
+[*]
+trim_trailing_whitespace = true
+insert_final_newline = true
+max_line_length=140
+indent_size = 4
+indent_style = space
+end_of_line = lf
+
+[*.cs]
+resharper_csharp_place_expr_method_on_single_line = never
+
+[*.{fs,fsx}]
+fsharp_bar_before_discriminated_union_declaration=false
+fsharp_disable_elmish_syntax=true
+fsharp_max_array_or_list_number_of_items=2
+fsharp_max_array_or_list_width=80
+fsharp_max_infix_operator_expression=120
+fsharp_max_record_number_of_items=2
+fsharp_max_value_binding_width=120
+fsharp_space_before_colon=true
+fsharp_strict_mode=true
+
+# Terraform files
+[*.tf]
+indent_size = 2
+
+[*.json]
+indent_size = 2
+
+[*.yml]
+indent_size = 2
+
+[*.yaml]
+indent_size = 2
+
+[*.csproj]
+indent_size = 2
+
+[*.avsc]
+indent_size = 2
