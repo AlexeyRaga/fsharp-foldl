@@ -67,7 +67,7 @@ module Fold =
             (fun (x1, x2) value -> (x1.Accept value, x2.Accept value))
             (fun (x1, x2) -> op (x1.Extract()) (x2.Extract()))
 
-    let tuple (fold1: Fold<'a, 'b>) (fold2: Fold<'a, 'c>) : Fold<'a, 'b*'c> =
+    let zip (fold1: Fold<'a, 'b>) (fold2: Fold<'a, 'c>) : Fold<'a, 'b*'c> =
         liftOp (fun a b -> (a, b)) fold1 fold2
 
     let retn x =
@@ -235,3 +235,17 @@ module Operators =
 
     let inline (<!>) f a = Fold.map f a
     let inline (<*>) f a = Fold.ap a f
+
+[<AutoOpen>]
+module FoldCE =
+    type FoldBuilder() =
+        member _.BindReturn(x, f) = Fold.map f x
+
+        member _.MergeSources(x, y) = Fold.zip x y
+
+        member _.Bind2Return(x, y, f : 'a*'b -> 'c) =
+            Fold.liftOp (fun a b -> f (a, b)) x y
+
+        member _.Return x = Fold.retn x
+
+    let fold = FoldBuilder()

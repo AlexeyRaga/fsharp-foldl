@@ -4,6 +4,14 @@
         <TargetFramework>net7.0</TargetFramework>
         <GenerateDocumentationFile>true</GenerateDocumentationFile>
         <NoWarn>3535</NoWarn>
+        <Title>Composable left folds</Title>
+        <Description>This library provides strict left folds that stream in constant memory, and you can combine folds using Applicative style to derive new folds. Derived folds still traverse the container just once and are often as efficient as hand-written folds.</Description>
+        <Copyright>Alexey Raga</Copyright>
+        <PackageProjectUrl>https://github.com/AlexeyRaga/fsharp-foldl</PackageProjectUrl>
+        <RepositoryUrl>https://github.com/AlexeyRaga/fsharp-foldl</RepositoryUrl>
+        <RepositoryType>github</RepositoryType>
+        <PackageTags>fsharp, data</PackageTags>
+        <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
     </PropertyGroup>
 
     <ItemGroup>

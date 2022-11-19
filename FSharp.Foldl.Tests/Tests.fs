@@ -100,4 +100,17 @@ let ``SumAndLength`` (x: int, xs : int list) =
     let sumAndLen =
         Seq.fold step (0, 0) xs
 
-    Fold.fold (Fold.tuple mySum Fold.length) xs === sumAndLen
+    Fold.fold (Fold.zip mySum Fold.length) xs === sumAndLen
+
+[<Property>]
+let ``CE features`` (xs : int list) =
+    let xs = xs |> List.map int64
+
+    let resultFold =
+        fold {
+            let! x = Fold.sum
+            and! y = Fold.length
+            return (x, y)
+        }
+
+    Fold.fold resultFold xs === (List.sum xs, List.length xs)
