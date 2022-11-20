@@ -21,7 +21,7 @@ Usually people work around this by hand-writing a strict left fold that looks
 something like this:
 
 ```fsharp
-sumAndLength (xs : int seq) : (int, int) =
+let sumAndLength (xs : int seq) : (int, int) =
     let step (x, y) n = x + n, y + 1
     xs |> Seq.fold step (0, 0)
 ```
@@ -36,7 +36,7 @@ That's exactly what this library does! Using this library you can instead write:
 ```fsharp
 open FSharp.Foldl
 
-sumAndLength (xs : int seq) : (int, int) =
+let sumAndLength (xs : int seq) : (int, int) =
     Fold.fold (Fold.tuple Fold.sum Fold.length) xs
 
 ```
