@@ -37,7 +37,7 @@ That's exactly what this library does! Using this library you can instead write:
 open FSharp.Foldl
 
 let sumAndLength (xs : int seq) : (int, int) =
-    Fold.fold (Fold.tuple Fold.sum Fold.length) xs
+    Fold.fold (Fold.zip Fold.sum Fold.length) xs
 
 ```
 
@@ -54,14 +54,14 @@ Same thing for the Fold.length value:
 let length = Fold.create 0 (fun n _ -> n + 1) id
 ```
 
-... and `Fold.tuple` combines them into a new datatype storing
+... and `Fold.zip` combines them into a new datatype storing
 the composite step function and starting state:
 
 ```fsharp
 // Fold<int, int * int>
 let sumAndLengthFold = Fold.zip sum length
 
-let result = Fold.fold delta [1.0 .. 10] // (55.0, 10)
+let result = Fold.fold sumAndLengthFold [1.0 .. 10] // (55.0, 10)
 ```
 
 Alternatively the Applicative syntax can be used to compose folds:
