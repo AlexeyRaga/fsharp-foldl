@@ -200,7 +200,7 @@ module Fold =
 
     /// Computes the maximum element with respect to the given comparison function
     let maximumBy<'a, 'k when 'k : comparison> (f : 'a -> 'k) : Fold<'a, 'a option> =
-        let max' a b = if f a > f b then a else b
+        let max' a b = if f a >= f b then a else b
         fold1_<'a> max'
 
     /// Computes the maximum element with respect to the given comparison function
