@@ -4,6 +4,8 @@ Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "FSharp.Foldl", "FSharp.Fold
 EndProject
 Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "FSharp.Foldl.Tests", "FSharp.Foldl.Tests\FSharp.Foldl.Tests.fsproj", "{CC16A085-2387-4205-915C-B984254C1FB3}"
 EndProject
+Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "FSharp.Foldl.Benchmarks", "FSharp.Foldl.Benchmarks\FSharp.Foldl.Benchmarks.fsproj", "{39F6ECA7-002E-492F-BBAD-6122FAB17B88}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -18,5 +20,9 @@ Global
 		{CC16A085-2387-4205-915C-B984254C1FB3}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{CC16A085-2387-4205-915C-B984254C1FB3}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{CC16A085-2387-4205-915C-B984254C1FB3}.Release|Any CPU.Build.0 = Release|Any CPU
+		{39F6ECA7-002E-492F-BBAD-6122FAB17B88}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{39F6ECA7-002E-492F-BBAD-6122FAB17B88}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{39F6ECA7-002E-492F-BBAD-6122FAB17B88}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{39F6ECA7-002E-492F-BBAD-6122FAB17B88}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal
