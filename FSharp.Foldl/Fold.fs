@@ -157,14 +157,14 @@ module Fold =
     let and' : Fold<bool, bool> =
         create true (&&) id
 
-     /// Returns 'True' if any element is 'True', 'False' otherwise
+    /// Returns 'True' if any element is 'True', 'False' otherwise
     let or' : Fold<bool, bool> =
         create false (||) id
 
     let sqrt<'a when 'a :> IRootFunctions<'a>> (a : Fold<'a, 'a>) =
         Fold.map (fun x -> 'a.Sqrt x) a
 
-     /// Compute a numerically stable arithmetic mean of all elements
+    /// Compute a numerically stable arithmetic mean of all elements
     let mean<'a when 'a :> IFloatingPoint<'a>> : Fold<'a, 'a> =
         let step (x, n) y =
             let n' = 'a.op_Increment n
@@ -268,15 +268,14 @@ module Operators =
 [<AutoOpen>]
 module FoldCE =
     type FoldBuilder() =
-        member _.BindReturn(x, f) = Fold.map f x
         member _.MergeSources(x1, x2) = Fold.zip x1 x2
-
         member _.MergeSources3(x1, x2, x3) = Fold.zip3 x1 x2 x3
         member _.MergeSources4(x1, x2, x3, x4) = Fold.zip4 x1 x2 x3 x4
+
+        member _.BindReturn(x, f) = Fold.map f x
         member _.Bind2Return(x1, x2, f : 'a * 'b -> 'r) = Fold.zip x1 x2 |> Fold.map f
         member _.Bind3Return(x1, x2, x3, f : 'a * 'b * 'c -> 'r) = Fold.zip3 x1 x2 x3 |> Fold.map f
         member _.Bind4Return(x1, x2, x3, x4, f : 'a * 'b * 'c * 'd -> 'r) = Fold.zip4 x1 x2 x3 x4 |> Fold.map f
-
 
         member _.Return x = Fold.retn x
 
