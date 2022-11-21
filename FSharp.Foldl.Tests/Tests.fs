@@ -17,6 +17,10 @@ let ``Fold sum`` (xs: int list) =
     let xs = xs |> List.map int64
     Fold.fold Fold.sum xs === List.sum xs
 
+[<Property(100<tests>)>]
+let ``Builtin average`` (x: int, xs: int list) =
+    let xs = (x :: xs) |> List.map double
+    Fold.fold Fold.average xs === List.average xs
 
 [<Fact>]
 let ``Compose folds into average`` () =
@@ -114,3 +118,4 @@ let ``CE features`` (xs : int list) =
         }
 
     Fold.fold resultFold xs === (List.sum xs, List.length xs)
+

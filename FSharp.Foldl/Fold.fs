@@ -3,77 +3,101 @@
 open System
 open System.Numerics
 
-// Public interface for a fold: accepts values and folds them into results
-type Fold<'value, 'result> =
-    abstract member Accept: 'value -> Fold<'value, 'result>
-    abstract member Extract: unit -> 'result
+[<Struct>]
+type Fold<'value, 'result> = private Fold of step: (obj -> 'value -> obj) * current: obj *  extract: (obj -> 'result)
 
 [<RequireQualifiedAccess>]
 module Fold =
-
-    // Hidden implementation, to hide an intermediate state
-    type private FoldImpl<'value, 'state, 'result>
-        (current: 'state, step: 'state -> 'value -> 'state, extract: 'state -> 'result) =
-        interface Fold<'value, 'result> with
-            member this.Accept(value) = FoldImpl(step current value, step, extract)
-            member this.Extract() = extract current
-
     /// Creates a new fold
     let create (zero: 'x) (step: 'x -> 'a -> 'x) (extract: 'x -> 'b) =
-        FoldImpl(zero, step, extract) :> Fold<'a, 'b>
+        Fold(
+            (fun x a -> box (step (Unchecked.unbox<'x> x) a)),
+            box zero,
+            (fun x -> extract (Unchecked.unbox<'x> x)))
+
 
     /// Executes the fold on a given sequence and returns its result
-    let fold (fld: Fold<'a, 'b>) xs =
-        let res = xs |> Seq.fold (fun (s: Fold<'a, 'b>) -> s.Accept) fld
-        res.Extract()
+    let fold (Fold(step, current, extract)) xs =
+        let res = xs |> Seq.fold step current
+        extract res
 
     /// Functorial map (transform results)
-    let map (f : 'b -> 'c) (fold : Fold<'a, 'b>) =
-        create fold (fun x -> x.Accept) (fun x -> f (x.Extract()))
+    let map (f : 'b -> 'c) (Fold(step, current, extract)) =
+        Fold(step, current, extract >> f)
 
     /// Cofunctorial map (adapt inputs)
-    let premap (f : 'b -> 'a) (fold : Fold<'a, 'r>) : Fold<'b, 'r> =
-        create fold (fun x v -> x.Accept(f v)) (fun x -> x.Extract())
+    let premap (f : 'b -> 'a) (Fold(step, current, extract)) : Fold<'b, 'r> =
+        Fold((fun x b -> step x (f b)), current, extract)
 
     /// Profunctorial dimap (both map and comap at once)
-    let dimap (f : 'b -> 'a) (g: 'c -> 'd) (fold : Fold<'a, 'c>) : Fold<'b, 'd> =
-        create fold (fun x v -> x.Accept(f v)) (fun x -> g (x.Extract()))
+    let dimap (f : 'b -> 'a) (g: 'c -> 'd) (Fold(step, current, extract)) : Fold<'b, 'd> =
+        Fold((fun x b -> step x (f b)), current, extract >> g)
 
     /// Returns a new 'Fold' where the folder's input is used
     /// only when the input satisfies a predicate f
-    let prefilter (f : 'a -> bool) (a : Fold<'a, 'b>) : Fold<'a, 'b> =
-        create a (fun x v -> if f v then x.Accept v else x) (fun x -> x.Extract())
+    let prefilter (f : 'a -> bool) (Fold(step, current, extract)) : Fold<'a, 'b> =
+        let step' x a = if f a then step x a else x
+        Fold(step', current, extract)
 
     /// Transforms a 'Fold' into one which ignores elements
     /// until they stop satisfying a predicate
-    let predropWhile (f : 'a -> bool) (a : Fold<'a, 'b>) : Fold<'a, 'b> =
-        create
-            (true, a)
-            (fun (dropping, x) v -> if dropping && f v then (true, x) else (false, x.Accept v))
-            (fun (_, x) -> x.Extract())
+    let predropWhile (f : 'a -> bool) (Fold(step, current, extract)) : Fold<'a, 'b> =
+        let step' s a =
+            let dropping, x = Unchecked.unbox<bool * obj> s
+            if dropping && f a then box (true, x) else (false, step x a)
+        let extract' s =
+            let _, x = Unchecked.unbox<bool * obj> s
+            extract x
+        Fold(step', box (true, current), extract')
 
     /// returns a new 'FoldM' that ignores the first @n@ inputs but
     /// otherwise behaves the same as the original fold
-    let drop n (a : Fold<'a, 'b>) : Fold<'a, 'b> =
-        create
-            (n, a)
-            (fun (n', x) v -> if n' = 0 then (0, x.Accept v) else (n' - 1, x))
-            (fun (_, x) -> x.Extract())
+    let drop n (Fold(step, current, extract)) : Fold<'a, 'b> =
+        let step' s a =
+            let n', x = Unchecked.unbox<int * obj> s
+            if n' = 0 then box (0, step x a) else (n' - 1, x)
+        let extract' s =
+            let _, x = Unchecked.unbox<int * obj> s
+            extract x
+        Fold(step', box (n, current), extract')
 
     /// Lifts the operation on the fold results into the operation on folds
-    let liftOp (op : 'b -> 'c -> 'd) (fold1 : Fold<'a, 'b>) (fold2 : Fold<'a, 'c>) : Fold<'a, 'd> =
-        create
-            (fold1, fold2)
-            (fun (x1, x2) value -> (x1.Accept value, x2.Accept value))
-            (fun (x1, x2) -> op (x1.Extract()) (x2.Extract()))
+    let liftOp (op : 'b -> 'c -> 'd) (Fold(stepL, currentL, extractL)) (Fold(stepR, currenR, extractR)) : Fold<'a, 'd> =
+        let current = box (currentL, currenR)
+        let step x a =
+            let xL, xR = Unchecked.unbox<obj * obj> x
+            box (stepL xL a, stepR xR a)
+        let extract x =
+            let xL, xR = Unchecked.unbox<obj * obj> x
+            op (extractL xL) (extractR xR)
+        Fold(step, current, extract)
+
 
     let zip (fold1: Fold<'a, 'b>) (fold2: Fold<'a, 'c>) : Fold<'a, 'b*'c> =
         liftOp (fun a b -> (a, b)) fold1 fold2
 
+    let zip3 (Fold(step1, current1, extract1)) (Fold(step2, curren2, extract2)) (Fold(step3, current3, extract3)) =
+        let step x a =
+            let x1, x2, x3 = Unchecked.unbox<obj * obj * obj> x
+            box (step1 x1 a, step2 x2 a, step3 x3 a)
+        let extract x =
+            let x1, x2, x3 = Unchecked.unbox<obj * obj * obj> x
+            extract1 x1, extract2 x2, extract3 x3
+        Fold(step, (current1, curren2, current3), extract)
+
+    let zip4 (Fold(step1, current1, extract1)) (Fold(step2, curren2, extract2)) (Fold(step3, current3, extract3)) (Fold(step4, current4, extract4)) =
+        let step x a =
+            let x1, x2, x3, x4 = Unchecked.unbox<obj * obj * obj * obj> x
+            box (step1 x1 a, step2 x2 a, step3 x3 a, step4 x4 a)
+        let extract x =
+            let x1, x2, x3, x4 = Unchecked.unbox<obj * obj * obj * obj> x
+            extract1 x1, extract2 x2, extract3 x3, extract4 x4
+        Fold(step, (current1, curren2, current3, current4), extract)
+
     let retn x =
         create () (fun () _ -> ()) (fun () -> x)
 
-    let ap (fold2 : Fold<'a, 'c>) (fold1 : Fold<'a, 'c -> 'd>) =
+    let inline ap (fold2 : Fold<'a, 'c>) (fold1 : Fold<'a, 'c -> 'd>) =
         liftOp id fold1 fold2
 
     let sequence (folds : Fold<'a, 'b> list) : Fold<'a, 'b list> =
@@ -103,7 +127,7 @@ module Fold =
             (fun (sum, num) value -> sum + value, ('a.op_Increment num) )
             (fun (sum, num) -> sum / num)
 
-    /// Return the last N elements
+     /// Return the last N elements
     let lastN n : Fold<'a, 'a list> =
         if n = 0 then
             create () (fun _ _ -> ()) (fun _ -> [])
@@ -117,11 +141,11 @@ module Fold =
                         (num + 1, q.Enqueue value))
                 (fun (_, q) -> List.ofSeq q)
 
-    /// Returns 'True' if the sequence is empty, 'False' otherwise
+     /// Returns 'True' if the sequence is empty, 'False' otherwise
     let isEmpty<'a> : Fold<'a, bool> =
         create true (fun _ _ -> false) id
 
-    /// returns 'True' if all elements satisfy the predicate, 'False' otherwise
+     /// returns 'True' if all elements satisfy the predicate, 'False' otherwise
     let all (p : 'a -> bool) : Fold<'a, bool> =
         create true (fun x a -> x && p a) id
 
@@ -133,14 +157,14 @@ module Fold =
     let and' : Fold<bool, bool> =
         create true (&&) id
 
-    /// Returns 'True' if any element is 'True', 'False' otherwise
+     /// Returns 'True' if any element is 'True', 'False' otherwise
     let or' : Fold<bool, bool> =
         create false (||) id
 
     let sqrt<'a when 'a :> IRootFunctions<'a>> (a : Fold<'a, 'a>) =
         Fold.map (fun x -> 'a.Sqrt x) a
 
-    /// Compute a numerically stable arithmetic mean of all elements
+     /// Compute a numerically stable arithmetic mean of all elements
     let mean<'a when 'a :> IFloatingPoint<'a>> : Fold<'a, 'a> =
         let step (x, n) y =
             let n' = 'a.op_Increment n
@@ -167,14 +191,19 @@ module Fold =
     let std<'a when 'a :> IRootFunctions<'a> and 'a :> IFloatingPoint<'a>> = sqrt<'a> variance<'a>
 
     /// Combine two folds into a fold over inputs for either of them.
-    let choice (a : Fold<'a1, 'b1>) (b : Fold<'a2, 'b2>) : Fold<Choice<'a1, 'a2>, 'b1 * 'b2> =
-        create
-            (a, b)
-            (fun (x1, x2) v ->
-                match v with
-                | Choice1Of2 v1 -> x1.Accept v1, x2
-                | Choice2Of2 v2 -> x1, x2.Accept v2)
-            (fun (x1, x2) -> x1.Extract(), x2.Extract())
+    let choice (Fold(stepL, currentL, extractL)) (Fold(stepR, currenR, extractR)) : Fold<Choice<'a1, 'a2>, 'b1 * 'b2> =
+        let step x a =
+            let xL, xR = Unchecked.unbox<obj * obj> x
+            match a with
+            | Choice1Of2 x -> box (stepL xL x, xR)
+            | Choice2Of2 x -> box (xL, stepR xR x)
+
+        let extract x =
+            let xL, xR = Unchecked.unbox<obj * obj> x
+            (extractL xL), (extractR xR)
+
+        Fold(step, (currentL, currenR), extract)
+
 
     let private fold1_<'a> (f : 'a -> 'a -> 'a) : Fold<'a, 'a option> =
         let step mx a =
@@ -240,11 +269,14 @@ module Operators =
 module FoldCE =
     type FoldBuilder() =
         member _.BindReturn(x, f) = Fold.map f x
+        member _.MergeSources(x1, x2) = Fold.zip x1 x2
 
-        member _.MergeSources(x, y) = Fold.zip x y
+        member _.MergeSources3(x1, x2, x3) = Fold.zip3 x1 x2 x3
+        member _.MergeSources4(x1, x2, x3, x4) = Fold.zip4 x1 x2 x3 x4
+        member _.Bind2Return(x1, x2, f : 'a * 'b -> 'r) = Fold.zip x1 x2 |> Fold.map f
+        member _.Bind3Return(x1, x2, x3, f : 'a * 'b * 'c -> 'r) = Fold.zip3 x1 x2 x3 |> Fold.map f
+        member _.Bind4Return(x1, x2, x3, x4, f : 'a * 'b * 'c * 'd -> 'r) = Fold.zip4 x1 x2 x3 x4 |> Fold.map f
 
-        member _.Bind2Return(x, y, f : 'a*'b -> 'c) =
-            Fold.liftOp (fun a b -> f (a, b)) x y
 
         member _.Return x = Fold.retn x
 
