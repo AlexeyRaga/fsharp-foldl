@@ -99,7 +99,7 @@ jobs:
         uses: actions/download-artifact@v3
         id: download
         with:
-          name: packages-ubuntu-latest-net6.x
+          name: packages-ubuntu-latest-net7.x
           path: packages
 
       - uses: actions/setup-dotnet@v3
