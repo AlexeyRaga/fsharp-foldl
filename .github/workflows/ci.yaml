@@ -88,40 +88,38 @@ jobs:
           name: packages-${{ matrix.os }}-net${{ matrix.dotnet }}
           path: ${{ github.workspace }}/packages/**/*.nupkg
 
+  release:
+    runs-on: ubuntu-latest
+    needs: [ git-version, build ]
+    if: github.ref == 'refs/heads/main'
 
 
-#  release:
-#    runs-on: ubuntu-latest
-#    needs: [ git-version, build ]
-#    if: github.ref == 'refs/heads/main'
-#
-#
-#    steps:
-#      - name: Get packages for publishing
-#        uses: actions/download-artifact@v3
-#        id: download
-#        with:
-#          name: packages-ubuntu-latest-net6.x
-#          path: packages
-#
-#      - uses: actions/setup-dotnet@v3
-#        with:
-#          dotnet-version: "6.x"
-#
-#      - name: Publish packages
-#        run: dotnet nuget push ${{ github.workspace }}/packages/**/*.nupkg -k ${{ secrets.NUGET_API_KEY }} -s https://api.nuget.org/v3/index.json
-#
-#      - name: Create tag
-#        id: create_tag
-#        uses: anothrNick/github-tag-action@v1
-#        env:
-#          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-#          CUSTOM_TAG: v${{ needs.git-version.outputs.MajorMinorPatch }}
-#
-#      - name: Create release
-#        uses: ncipollo/release-action@v1
-#        with:
-#          name: Release ${{ needs.git-version.outputs.MajorMinorPatch }}
-#          tag: ${{ steps.create_tag.outputs.tag }}
-#          token: ${{ secrets.GITHUB_TOKEN }}
-#          generateReleaseNotes: true
+    steps:
+      - name: Get packages for publishing
+        uses: actions/download-artifact@v3
+        id: download
+        with:
+          name: packages-ubuntu-latest-net6.x
+          path: packages
+
+      - uses: actions/setup-dotnet@v3
+        with:
+          dotnet-version: "6.x"
+
+      - name: Publish packages
+        run: dotnet nuget push ${{ github.workspace }}/packages/**/*.nupkg -k ${{ secrets.NUGET_API_KEY }} -s https://api.nuget.org/v3/index.json
+
+      - name: Create tag
+        id: create_tag
+        uses: anothrNick/github-tag-action@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CUSTOM_TAG: v${{ needs.git-version.outputs.MajorMinorPatch }}
+
+      - name: Create release
+        uses: ncipollo/release-action@v1
+        with:
+          name: Release ${{ needs.git-version.outputs.MajorMinorPatch }}
+          tag: ${{ steps.create_tag.outputs.tag }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+          generateReleaseNotes: true
