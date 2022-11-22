@@ -11,7 +11,7 @@ module Fold =
     /// Creates a new fold
     let create (zero: 'x) (step: 'x -> 'a -> 'x) (extract: 'x -> 'b) =
         Fold(
-            (fun (x : obj) a -> box (step (x :?> 'x) a)),
+            (fun (x : obj) a -> (step (x :?> 'x) a) :> obj),
             box zero,
             (fun (x : obj) -> extract (x :?> 'x)))
 
@@ -192,14 +192,14 @@ module Fold =
 
     /// Combine two folds into a fold over inputs for either of them.
     let choice (Fold(stepL, currentL, extractL)) (Fold(stepR, currenR, extractR)) : Fold<Choice<'a1, 'a2>, 'b1 * 'b2> =
-        let step x a =
-            let xL, xR = Unchecked.unbox<obj * obj> x
+        let step (x : obj) a =
+            let xL, xR = x :?> obj * obj
             match a with
             | Choice1Of2 x -> box (stepL xL x, xR)
             | Choice2Of2 x -> box (xL, stepR xR x)
 
-        let extract x =
-            let xL, xR = Unchecked.unbox<obj * obj> x
+        let extract (x : obj) =
+            let xL, xR = x :?> obj * obj
             (extractL xL), (extractR xR)
 
         Fold(step, (currentL, currenR), extract)
