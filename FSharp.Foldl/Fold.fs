@@ -11,9 +11,9 @@ module Fold =
     /// Creates a new fold
     let create (zero: 'x) (step: 'x -> 'a -> 'x) (extract: 'x -> 'b) =
         Fold(
-            (fun x a -> box (step (Unchecked.unbox<'x> x) a)),
+            (fun (x : obj) a -> box (step (x :?> 'x) a)),
             box zero,
-            (fun x -> extract (Unchecked.unbox<'x> x)))
+            (fun (x : obj) -> extract (x :?> 'x)))
 
 
     /// Executes the fold on a given sequence and returns its result
@@ -42,33 +42,33 @@ module Fold =
     /// Transforms a 'Fold' into one which ignores elements
     /// until they stop satisfying a predicate
     let predropWhile (f : 'a -> bool) (Fold(step, current, extract)) : Fold<'a, 'b> =
-        let step' s a =
-            let dropping, x = Unchecked.unbox<bool * obj> s
+        let step' (s : obj) a =
+            let dropping, x = s :?> bool * obj
             if dropping && f a then box (true, x) else (false, step x a)
-        let extract' s =
-            let _, x = Unchecked.unbox<bool * obj> s
+        let extract' (s : obj) =
+            let _, x = s :?> bool * obj
             extract x
         Fold(step', box (true, current), extract')
 
     /// returns a new 'FoldM' that ignores the first @n@ inputs but
     /// otherwise behaves the same as the original fold
     let drop n (Fold(step, current, extract)) : Fold<'a, 'b> =
-        let step' s a =
-            let n', x = Unchecked.unbox<int * obj> s
+        let step' (s : obj) a =
+            let n', x = s :?> int * obj
             if n' = 0 then box (0, step x a) else (n' - 1, x)
-        let extract' s =
-            let _, x = Unchecked.unbox<int * obj> s
+        let extract' (s : obj) =
+            let _, x = s :?> int * obj
             extract x
         Fold(step', box (n, current), extract')
 
     /// Lifts the operation on the fold results into the operation on folds
     let liftOp (op : 'b -> 'c -> 'd) (Fold(stepL, currentL, extractL)) (Fold(stepR, currenR, extractR)) : Fold<'a, 'd> =
         let current = box (currentL, currenR)
-        let step x a =
-            let xL, xR = Unchecked.unbox<obj * obj> x
+        let step (x : obj) a : obj =
+            let xL, xR = x :?> obj * obj
             box (stepL xL a, stepR xR a)
-        let extract x =
-            let xL, xR = Unchecked.unbox<obj * obj> x
+        let extract (x : obj) =
+            let xL, xR = x :?> obj * obj
             op (extractL xL) (extractR xR)
         Fold(step, current, extract)
 
@@ -77,20 +77,20 @@ module Fold =
         liftOp (fun a b -> (a, b)) fold1 fold2
 
     let zip3 (Fold(step1, current1, extract1)) (Fold(step2, curren2, extract2)) (Fold(step3, current3, extract3)) =
-        let step x a =
-            let x1, x2, x3 = Unchecked.unbox<obj * obj * obj> x
-            box (step1 x1 a, step2 x2 a, step3 x3 a)
-        let extract x =
-            let x1, x2, x3 = Unchecked.unbox<obj * obj * obj> x
+        let step (x : obj) a : obj =
+            let x1, x2, x3 = x :?> obj * obj * obj
+            (step1 x1 a, step2 x2 a, step3 x3 a)
+        let extract (x : obj) =
+            let x1, x2, x3 = x :?> obj * obj * obj
             extract1 x1, extract2 x2, extract3 x3
         Fold(step, (current1, curren2, current3), extract)
 
     let zip4 (Fold(step1, current1, extract1)) (Fold(step2, curren2, extract2)) (Fold(step3, current3, extract3)) (Fold(step4, current4, extract4)) =
-        let step x a =
-            let x1, x2, x3, x4 = Unchecked.unbox<obj * obj * obj * obj> x
-            box (step1 x1 a, step2 x2 a, step3 x3 a, step4 x4 a)
-        let extract x =
-            let x1, x2, x3, x4 = Unchecked.unbox<obj * obj * obj * obj> x
+        let step (x : obj) a : obj =
+            let x1, x2, x3, x4 = x :?> obj * obj * obj * obj
+            (step1 x1 a, step2 x2 a, step3 x3 a, step4 x4 a)
+        let extract (x : obj) =
+            let x1, x2, x3, x4 = x :?> obj * obj * obj * obj
             extract1 x1, extract2 x2, extract3 x3, extract4 x4
         Fold(step, (current1, curren2, current3, current4), extract)
 
@@ -141,11 +141,11 @@ module Fold =
                         (num + 1, q.Enqueue value))
                 (fun (_, q) -> List.ofSeq q)
 
-     /// Returns 'True' if the sequence is empty, 'False' otherwise
+    /// Returns 'True' if the sequence is empty, 'False' otherwise
     let isEmpty<'a> : Fold<'a, bool> =
         create true (fun _ _ -> false) id
 
-     /// returns 'True' if all elements satisfy the predicate, 'False' otherwise
+    /// returns 'True' if all elements satisfy the predicate, 'False' otherwise
     let all (p : 'a -> bool) : Fold<'a, bool> =
         create true (fun x a -> x && p a) id
 
