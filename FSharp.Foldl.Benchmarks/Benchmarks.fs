@@ -1,14 +1,13 @@
 ﻿module FSharp.Foldl.Benchmarks
 
+open System.Linq
+
 open BenchmarkDotNet.Attributes
-type Pair<'a, 'b> = Pair of 'a * 'b
-let sum a b = a + b
-type Foo<'a> = Foo of 'a * ('a -> 'a -> 'a)
 
 type Benchmarks() =
     let collection : double list = [ 1..1000 ]
 
-    [<Benchmark(Description = "Plain handcrafted averages", Baseline = true)>]
+    [<Benchmark(Description = "Plain handcrafted averages")>]
     member this.ManualAverage() =
         let step (x, y) n = x + n, y + 1
         collection |> Seq.fold step (0.0, 0)
@@ -39,14 +38,10 @@ type Benchmarks() =
     member this.Zip4() =
         collection |> Fold.fold (Fold.zip4 Fold.sum Fold.sum Fold.sum Fold.sum)
 
-    [<Benchmark(Description = "Manual zip4")>]
-    member this.ManualZip4() =
-        let z : double = 0
-        let Foo(a, _), Foo(b, _), Foo(c, _), Foo(d, _) =
-            collection
-            |> Seq.fold
-                (fun (Foo (a1, f1), Foo (a2, f2), Foo (a3, f3), Foo (a4, f4)) a ->
-                    Foo(f1 a1 a, f1), Foo(f2 a2 a, f2), Foo(f3 a3 a, f3), Foo(f4 a4 a, f4))
-
-                (Foo(z, sum), Foo(z, sum), Foo(z, sum), Foo(z, sum))
-        a, b, c, d
+    [<Benchmark(Description = "zip4 composed")>]
+    member this.Zip4Composed() =
+        let s1 = Fold.zip Fold.sum Fold.sum
+        let s2 = Fold.zip s1 Fold.sum
+        let s3 = Fold.zip s2 Fold.sum
+        let fld = s3 |> Fold.map (fun (((a, b), c), d) -> (a, b, c, d))
+        collection |> Fold.fold fld
