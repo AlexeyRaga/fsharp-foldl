@@ -26,13 +26,13 @@ jobs:
           fetch-depth: 0
 
       - name: Setup GitVersion
-        uses: gittools/actions/gitversion/setup@v0.9.15
+        uses: gittools/actions/gitversion/setup@v0
         with:
           versionSpec: "5.x"
 
       - name: Run GitVersion
         id: gitversion
-        uses: gittools/actions/gitversion/execute@v0.9.15
+        uses: gittools/actions/gitversion/execute@v0
         with:
           useConfigFile: true
           configFilePath: ${{ github.workspace }}/GitVersion.yml
@@ -44,7 +44,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        dotnet: [ "7.x" ]
+        dotnet: [ "8.x" ]
         os: [ ubuntu-latest, macOS-latest, windows-latest ]
 
     steps:
@@ -52,7 +52,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      - uses: actions/setup-dotnet@v3
+      - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: ${{ matrix.dotnet }}
 
@@ -99,12 +99,12 @@ jobs:
         uses: actions/download-artifact@v3
         id: download
         with:
-          name: packages-ubuntu-latest-net7.x
+          name: packages-ubuntu-latest-net8.x
           path: packages
 
-      - uses: actions/setup-dotnet@v3
+      - uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: "7.x"
+          dotnet-version: "8.x"
 
       - name: Publish packages
         run: dotnet nuget push ${{ github.workspace }}/packages/**/*.nupkg -k ${{ secrets.NUGET_API_KEY }} -s https://api.nuget.org/v3/index.json
