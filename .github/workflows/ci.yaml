@@ -21,7 +21,7 @@ jobs:
       NuGetVersionV2: ${{ steps.gitversion.outputs.NuGetVersionV2 }}
       MajorMinorPatch: ${{ steps.gitversion.outputs.MajorMinorPatch }}
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
@@ -48,7 +48,7 @@ jobs:
         os: [ ubuntu-latest, macOS-latest, windows-latest ]
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
@@ -109,17 +109,24 @@ jobs:
       - name: Publish packages
         run: dotnet nuget push ${{ github.workspace }}/packages/**/*.nupkg -k ${{ secrets.NUGET_API_KEY }} -s https://api.nuget.org/v3/index.json
 
-      - name: Create tag
-        id: create_tag
-        uses: anothrNick/github-tag-action@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          CUSTOM_TAG: v${{ needs.git-version.outputs.MajorMinorPatch }}
+      - name: Tag published version
+        uses: actions/github-script@v7
+        if: (github.ref == 'refs/heads/main')
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            github.rest.git.createRef({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              ref: 'refs/tags/${{ needs.git-version.outputs.MajorMinorPatch }}',
+              sha: context.sha,
+              force: true
+            })
 
       - name: Create release
         uses: ncipollo/release-action@v1
         with:
           name: Release ${{ needs.git-version.outputs.MajorMinorPatch }}
-          tag: ${{ steps.create_tag.outputs.tag }}
+          tag: ${{ needs.git-version.outputs.MajorMinorPatch }}
           token: ${{ secrets.GITHUB_TOKEN }}
           generateReleaseNotes: true
