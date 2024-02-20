@@ -88,3 +88,4 @@ let sumAndLengthFold =
 
 let result = Fold.fold sumAndLengthFold [1.0 .. 10] // (55.0, 10)
 ```
+
