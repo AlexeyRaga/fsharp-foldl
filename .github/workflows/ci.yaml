@@ -1,60 +1,28 @@
 name: CI
 
-defaults:
-  run:
-    shell: bash
-
 on:
   push:
-    branches:
-      - main
+    branches: [ main ]
   pull_request:
+    branches: [ "main" ]
+
+permissions:
+  contents: write
 
 env:
   CONFIGURATION: Release
 
 jobs:
 
-  git-version:
-    runs-on: ubuntu-latest
-    outputs:
-      NuGetVersionV2: ${{ steps.gitversion.outputs.NuGetVersionV2 }}
-      MajorMinorPatch: ${{ steps.gitversion.outputs.MajorMinorPatch }}
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Setup GitVersion
-        uses: gittools/actions/gitversion/setup@v0
-        with:
-          versionSpec: "5.x"
-
-      - name: Run GitVersion
-        id: gitversion
-        uses: gittools/actions/gitversion/execute@v0
-        with:
-          useConfigFile: true
-          configFilePath: ${{ github.workspace }}/GitVersion.yml
-
   build:
-    runs-on: ${{ matrix.os }}
-    needs: [ git-version ]
-
-    strategy:
-      fail-fast: false
-      matrix:
-        dotnet: [ "8.x" ]
-        os: [ ubuntu-latest, macOS-latest, windows-latest ]
+    runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
       - uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: ${{ matrix.dotnet }}
+          global-json-file: global.json
 
       - name: Install dependencies
         run: dotnet tool restore && dotnet restore
@@ -63,70 +31,17 @@ jobs:
         run: |
           dotnet build --no-restore \
           -c ${{ env.CONFIGURATION }} \
-          -p:AssemblyVersion=${{ needs.git-version.outputs.MajorMinorPatch }} \
-          -p:PackageVersion=${{ needs.git-version.outputs.NuGetVersionV2 }} \
           -p:RepositoryUrl=${{ github.repositoryUrl }}
 
       - name: Run tests
         run: |
           dotnet test --no-restore --no-build \
           -c ${{ env.CONFIGURATION }} \
-          -p:AssemblyVersion=${{ needs.git-version.outputs.MajorMinorPatch }} \
-          -p:PackageVersion=${{ needs.git-version.outputs.NuGetVersionV2 }} \
           -p:RepositoryUrl=${{ github.repositoryUrl }}
 
-      - name: Copy packages
-        run: |
-          mkdir -p '${{ github.workspace }}/packages/${{ matrix.os }}-net${{ matrix.dotnet }}'
-          dotnet nuget push '${{ github.workspace }}/**/*.nupkg' -s '${{ github.workspace }}/packages/${{ matrix.os }}-net${{ matrix.dotnet }}'
-
-      - name: Prepare packages for publishing
-        uses: actions/upload-artifact@v3
-        with:
-          if-no-files-found: error
-          retention-days: 5
-          name: packages-${{ matrix.os }}-net${{ matrix.dotnet }}
-          path: ${{ github.workspace }}/packages/**/*.nupkg
-
-  release:
-    runs-on: ubuntu-latest
-    needs: [ git-version, build ]
-    if: github.ref == 'refs/heads/main'
-
-
-    steps:
-      - name: Get packages for publishing
-        uses: actions/download-artifact@v3
-        id: download
-        with:
-          name: packages-ubuntu-latest-net8.x
-          path: packages
-
-      - uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: "8.x"
+      - name: Pack
+        run: dotnet pack --no-restore --no-build -o ./packages
 
       - name: Publish packages
-        run: dotnet nuget push ${{ github.workspace }}/packages/**/*.nupkg -k ${{ secrets.NUGET_API_KEY }} -s https://api.nuget.org/v3/index.json
-
-      - name: Tag published version
-        uses: actions/github-script@v7
         if: (github.ref == 'refs/heads/main')
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          script: |
-            github.rest.git.createRef({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              ref: 'refs/tags/${{ needs.git-version.outputs.MajorMinorPatch }}',
-              sha: context.sha,
-              force: true
-            })
-
-      - name: Create release
-        uses: ncipollo/release-action@v1
-        with:
-          name: Release ${{ needs.git-version.outputs.MajorMinorPatch }}
-          tag: ${{ needs.git-version.outputs.MajorMinorPatch }}
-          token: ${{ secrets.GITHUB_TOKEN }}
-          generateReleaseNotes: true
+        run: dotnet nuget push ${{ github.workspace }}/packages/**/*.nupkg -k ${{ secrets.NUGET_API_KEY }} -s https://api.nuget.org/v3/index.json --skip-duplicate

@@ -66,6 +66,18 @@ module Fold =
                 member this.RunStep step current extract =
                     create current (fun s a -> if f a then step s a else s) extract }
 
+    /// Transforms a 'Fold' into one which only accepts elements
+    /// while the predicate holds, ignoring all subsequent elements
+    let pretakeWhile (f : 'a -> bool) (fold : Fold<'a, 'b>) : Fold<'a, 'b> =
+        fold.RunFolder
+            { new Folder<_, _, _> with
+                member this.RunStep step current extract =
+                    let step' (struct (isTaking : bool, s)) a =
+                        if isTaking && f a then struct (true, step s a)
+                        else struct (false, s)
+
+                    create (struct (true, current)) step' (ValueTuple.snd >> extract) }
+
     /// Transforms a 'Fold' into one which ignores elements
     /// until they stop satisfying a predicate
     let predropWhile (f : 'a -> bool) (fold : Fold<'a, 'b>) =
@@ -80,7 +92,18 @@ module Fold =
 
                     create (struct (true, current)) step' (ValueTuple.snd >> extract) }
 
-    /// returns a new 'FoldM' that ignores the first @n@ inputs but
+    /// Returns a new 'Fold' that only processes the first n inputs,
+    /// ignoring all subsequent elements
+    let take n (fold : Fold<'a, 'b>) : Fold<'a, 'b> =
+        fold.RunFolder
+            { new Folder<_, _, _> with
+                member this.RunStep step current extract =
+                    let step' (struct (n', s)) a =
+                        if n' > 0 then struct (n' - 1, step s a) else struct (0, s)
+
+                    create (struct (n, current)) step' (ValueTuple.snd >> extract) }
+
+    /// Returns a new 'Fold' that ignores the first n inputs but
     /// otherwise behaves the same as the original fold
     let drop n (fold : Fold<'a, 'b>) : Fold<'a, 'b> =
         fold.RunFolder
@@ -195,6 +218,9 @@ module Fold =
     let head<'a> : Fold<'a, 'a option> = fold1_<'a> (fun a b -> a)
     /// Get the last element of a sequence or return 'None' if the sequence is empty
     let last<'a> : Fold<'a, 'a option> = fold1_<'a> (fun a b -> b)
+    /// Get the first element of a sequence or return a default value if the sequence is empty
+    let headOrDefault (a : 'a) : Fold<'a, 'a> = head |> map (Option.defaultValue a)
+
     /// Get the last element of a sequence or return a default value if the sequence is empty
     let lastOrDefault a : Fold<'a, 'a> = create a (fun _ x -> x) id
     /// Computes the maximum element
@@ -207,15 +233,50 @@ module Fold =
         let max' a b = if f a >= f b then a else b
         fold1_<'a> max'
 
-    /// Computes the maximum element with respect to the given comparison function
+    /// Computes the minimum element with respect to the given comparison function
     let minimumBy<'a, 'k when 'k : comparison> (f : 'a -> 'k) : Fold<'a, 'a option> =
-        let min' a b = if f a > f b then b else a
+        let min' a b = if f a <= f b then a else b
         fold1_<'a> min'
 
     /// returns 'True' if the container has an element equal to @a@, 'False' otherwise
     let elem<'a when 'a : equality> (a : 'a) : Fold<'a, bool> = any (fun x -> x = a)
     /// returns 'False' if the container has an element equal to @a@, 'True' otherwise
     let notElem<'a when 'a : equality> (a : 'a) : Fold<'a, bool> = all (fun x -> x <> a)
+
+    /// Counts the number of elements satisfying the predicate
+    let count (f : 'a -> bool) : Fold<'a, int> = prefilter f length
+
+    /// Attaches a zero-based index to each element before passing it to the given fold
+    let indexed (fold : Fold<int * 'a, 'b>) : Fold<'a, 'b> =
+        fold.RunFolder
+            { new Folder<_, _, _> with
+                member this.RunStep step current extract =
+                    let step' (struct (i, s)) a = struct (i + 1, step s (i, a))
+                    create (struct (0, current)) step' (ValueTuple.snd >> extract) }
+
+    /// Collects all elements into a list in order
+    let toList<'a> : Fold<'a, 'a list> =
+        create [] (fun acc x -> x :: acc) List.rev
+
+    /// Collects all elements into an array
+    let toArray<'a> : Fold<'a, 'a[]> =
+        create [] (fun acc x -> x :: acc) (List.rev >> Array.ofList)
+
+    /// Groups elements by key, collecting values into lists
+    let groupBy (f : 'a -> 'k) : Fold<'a, Map<'k, 'a list>> =
+        let step (m : Map<'k, 'a list>) a =
+            let k = f a
+            match Map.tryFind k m with
+            | Some xs -> Map.add k (a :: xs) m
+            | None    -> Map.add k [a] m
+
+        let extract m = m |> Map.map (fun _ xs -> List.rev xs)
+        create Map.empty step extract
+
+    /// Builds a map from elements using the given key and value projection functions.
+    /// If multiple elements share the same key, the last one wins.
+    let toMap (key : 'a -> 'k) (value : 'a -> 'v) : Fold<'a, Map<'k, 'v>> =
+        create Map.empty (fun m a -> Map.add (key a) (value a) m) id
 
     /// returns the first element that satisfies the predicate or 'None' if no element satisfies the predicate
     let find (f : 'a -> bool) : Fold<'a, 'a option> =
@@ -227,7 +288,7 @@ module Fold =
                 | _ -> x)
             id
 
-    /// Computes the sum of all elements
+    /// Combines two folds over the same input into a fold that produces a pair of their results
     let zip (fold1 : Fold<'a, 'b>) (fold2 : Fold<'a, 'c>) : Fold<'a, 'b * 'c> =
         let folder =
             { new Folder<_, _, _> with
