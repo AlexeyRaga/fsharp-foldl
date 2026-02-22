@@ -59,8 +59,11 @@ jobs:
         if: github.ref == 'refs/heads/main' && steps.version_check.outputs.is_new == 'true'
         run: dotnet nuget push ${{ github.workspace }}/packages/**/*.nupkg -k ${{ secrets.NUGET_API_KEY }} -s https://api.nuget.org/v3/index.json
 
-      - name: Tag release
+      - name: Create release
         if: github.ref == 'refs/heads/main' && steps.version_check.outputs.is_new == 'true'
-        run: |
-          git tag "v${{ steps.version_check.outputs.version }}"
-          git push origin "v${{ steps.version_check.outputs.version }}"
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.version_check.outputs.version }}
+          name: v${{ steps.version_check.outputs.version }}
+          files: ./packages/*.nupkg
+          generate_release_notes: true
